@@ -1,0 +1,92 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Yisong Tao"
+date: "August 23, 2015"
+output: 
+  html_document: 
+    keep_md: yes
+---
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. 
+
+##Goal
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+##Load libraries, set seed for random number generator
+```{r, results="hide", message=F, warning=F}
+library(abind)
+library(arm)
+library(caret)
+library(kernlab)
+library(klaR)
+library(rattle)
+library(randomForest)
+library(rpart)
+set.seed(1111)
+
+```
+
+##Load datasets, remove variables with > 50% missing values and variables unrelated to our prediction
+The training data for this project are available here: 
+*https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv*
+
+The test data are available here: 
+*https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv*
+
+The data for this project come from this source: *http://groupware.les.inf.puc-rio.br/har*. 
+
+```{r load and clean dataset}
+train <- read.csv("./pml-training.csv", header = TRUE, na.strings = c("NA","#DIV/0!", ""))
+test <- read.csv("./pml-testing.csv", header = TRUE, na.strings = c("NA", ""))
+#summary(train)
+#summary(test)
+na_flag <- sapply(colnames(train), function(x) if(sum(is.na(train[, x])) > 0.50*nrow(train))    {return(TRUE)
+}else{
+return(FALSE)
+}
+) #remove the variable with >50% missing values 
+train <- train[, !na_flag]
+train <- train[, -(1:7)] #remove unrelated variable
+names(train)
+```
+
+##Partition train dataset to get new train and test datasets
+```{r}
+inTrain = createDataPartition(y=train$classe, p=0.7, list=FALSE)
+new_train = train[inTrain,]
+new_test = train[-inTrain,]
+```
+Our `new_train` dataset has `r dim(new_train)[1]` observations and `new_test` dataset has `r dim(new_test)[1]` observations.
+
+##Random Forest modelling 
+
+We then use Random Forest method to develop a predictive model on our `new_train` dataset. We are going to use 5-fold cross validation in our predictive method. 
+```{r RFmodel}
+#RFcontrol <- trainControl(method="cv", 5)
+#RFmodel = train(classe ~ ., method="rf", data=new_train, trControl=RFcontrol, ntree = 250)
+#saveRDS(RFmodel, "rfmodel.RDS")
+#The above lines were commented out to save time on editing. The RF model process was done for the first time and the resulting model was saved to file "rfmodel.RDS". 
+RFmodel = readRDS("rfmodel.RDS")
+RFmodel
+```
+Maximum accuracy is 98.94% at mtry = 2 and is with out of sample error of 1.06%.
+
+```{r}
+plot(RFmodel)
+```
+##Validate model against `new_test` dataset
+```{r}
+confusionMatrix(new_test$classe, predict(RFmodel, new_test))
+RFModelAccuracy <- mean(predict(RFmodel, new_test) == new_test$classe) * 100
+```
+The accuracy of our model is `r RFModelAccuracy`% when applying to test dataset.
+```{r}
+plot(varImp(RFmodel))
+```
+Above is a plot of all the every variable in the `new_test` dataset.
+
+##Conclusion
+We've found a model with Random Forest method. When we cross validate the model against our `new_test` dataset we get a high accuracy of `r RFModelAccuracy`%.
+
